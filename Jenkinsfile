@@ -1,10 +1,10 @@
 pipeline {
     agent {
-        label 'build'
+        label 'build-server'
     }
 
     environment {
-        DOCKER_IMAGE = "${DOCKERHUB_USERNAME}/${DOCKERHUB_REPOSITORY}"
+        DOCKER_IMAGE = "${"minakshi2004"}/${"company-website"}"
         CONTAINER_NAME = "company-website"
     }
 
@@ -13,7 +13,7 @@ pipeline {
         stage('Checkout') {
             steps {
                 git branch: 'main',
-                    url: "${GITHUB_REPOSITORY_URL}"
+                    url: "${'https://github.com/minakshi-kk/company-website.git'}"
             }
         }
 
@@ -29,7 +29,7 @@ pipeline {
             steps {
                 withCredentials([
                     usernamePassword(
-                        credentialsId: 'dockerhub-credentials',
+                        credentialsId: '',
                         usernameVariable: 'DOCKER_USER',
                         passwordVariable: 'DOCKER_PASS'
                     )
