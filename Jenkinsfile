@@ -1,11 +1,11 @@
 pipeline {
     agent {
-        label 'build-server'
+        label 'jenkins'
     }
 
     environment {
-        DOCKER_IMAGE = "${"minakshi2004"}/${"company-website"}"
-        CONTAINER_NAME = "company-website"
+        DOCKER_IMAGE = 'company-website'
+        DOCKER_TAG = 'latest'
     }
 
     stages {
@@ -13,90 +13,89 @@ pipeline {
         stage('Checkout') {
             steps {
                 git branch: 'main',
-                    url: "${'https://github.com/minakshi-kk/company-website.git'}"
+                    url: 'https://github.com/minakshi-kk/company-website.git'
             }
         }
 
         stage('Build Docker Image') {
             steps {
                 sh '''
-                    docker build -t ${DOCKER_IMAGE}:latest .
+                    docker build -t company-website:latest .
                 '''
             }
         }
 
-        stage('Login to Docker Hub') {
+        stage('Verify Image') {
+            steps {
+                sh '''
+                    docker images
+                '''
+            }
+        }
+
+        stage('Push to Docker Hub') {
             steps {
                 withCredentials([
                     usernamePassword(
-                        credentialsId: '',
+                        credentialsId: 'dockerhub-credential',
                         usernameVariable: 'DOCKER_USER',
                         passwordVariable: 'DOCKER_PASS'
                     )
                 ]) {
                     sh '''
-                        echo "$DOCKER_PASS" | docker login \
-                        -u "$DOCKER_USER" --password-stdin
+                        echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+
+                        docker tag company-website:latest \
+                            "DOCKER_USER/company-website:latest"
+
+                        docker push $DOCKER_USER/company-website:latest
+
+                        docker logout
                     '''
                 }
-            }
-        }
-
-        stage('Push Docker Image') {
-            steps {
-                sh '''
-                    docker push ${DOCKER_IMAGE}:latest
-                '''
             }
         }
 
         stage('Deploy to Server') {
+            agent {
+                label 'build '
+            }
+
             steps {
                 withCredentials([
-                    sshUserPrivateKey(
-                        credentialsId: 'deployment-ssh-key',
-                        keyFileVariable: 'SSH_KEY',
-                        usernameVariable: 'SSH_USER'
+                    usernamePassword(
+                        credentialsId: 'dockerhub-credential',
+                        usernameVariable: 'DOCKER_USER',
+                        passwordVariable: 'DOCKER_PASS'
                     )
                 ]) {
                     sh '''
-                        ssh -o StrictHostKeyChecking=no \
-                        -i "$SSH_KEY" \
-                        "$SSH_USER@${DEPLOYMENT_SERVER_IP}" '
+                        echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
 
-                            docker pull ${DOCKER_IMAGE}:latest
+                        docker pull "$DOCKER_USER/comapany-website:latest"
 
-                            docker stop company-website || true
-                            docker rm company-website || true
+                        docker stop company-website || true
+                        docker rm company-website || true
 
-                            docker run -d \
-                                --name company-website \
-                                -p 9090:80 \
-                                --restart unless-stopped \
-                                ${DOCKER_IMAGE}:latest
-                        '
+                        docker run -d \
+                            --name company-website \
+                            -p 9090:80 \
+                            $DOCKER_USER/company-website:latest"
+
+                        docker logout
                     '''
                 }
-            }
-        }
-
-        stage('Verify Deployment') {
-            steps {
-                sh '''
-                    sleep 5
-                    curl -f http://${DEPLOYMENT_SERVER_IP}:9090
-                '''
             }
         }
     }
 
     post {
         success {
-            echo 'Application deployed successfully!'
+            echo 'CI/CD Pipeline completed successfully!'
         }
 
         failure {
-            echo 'Pipeline failed. Check Jenkins logs.'
+            echo 'CI/CD Pipeline failed. Check the console output.'
         }
     }
 }
