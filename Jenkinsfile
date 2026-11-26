@@ -16,7 +16,7 @@ pipeline {
             }
             steps {
                 git branch: 'main',
-                    url: 'https://github.com/Ameesha-vijayan/company-website.git'
+                    url: 'https://github.com/minakshi-kk/company-website.git'
             }
         }
 
